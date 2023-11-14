@@ -1,0 +1,209 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Nov 14 14:30:54 2023
+
+@author: marti
+"""
+
+import pygame
+import sys
+
+# Initialize Pygame
+pygame.init()
+
+# Constants
+WIDTH, HEIGHT = 600, 600
+FPS = 60
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+
+# Player properties
+player_size = 30
+player_x, player_y = 30, 30
+player_speed = 5
+gravity = 1
+jump_height = -15
+on_ground = False
+
+# Moving entity properties
+entity_size = 30
+entity_x, entity_y = 30, 300
+entity_speed = 2
+
+# List of maze configurations
+levels = [
+    [
+        "#####################",
+        "#S#               E #",
+        "# ### ###############",
+        "# # #               #",
+        "# # ############### #",
+        "# # #               #",
+        "# # # ###############",
+        "# #                 #",
+        "# ##########        #",
+        "# #                 #",
+        "# ################# #",
+        "#                   #",
+        "#####################",
+    ],
+    [
+        "#####################",
+        "#S                  #",
+        "################# ###",
+        "#   #               #",
+        "# # ############### #",
+        "# # #               #",
+        "# # # ###############",
+        "# #                 #",
+        "# ###################",
+        "#                 E #",
+        "#####################",
+    ],
+    # Add more levels as needed
+]
+
+# Load images
+player_img = pygame.image.load("player.png")
+wall_img = pygame.image.load("wall.png")
+goal_img = pygame.image.load("goal.png")
+entity_img = pygame.image.load("entity.png")
+background_img = pygame.image.load("background.jpg")
+
+# Resize images to match the cell size
+player_img = pygame.transform.scale(player_img, (player_size, player_size))
+wall_img = pygame.transform.scale(wall_img, (30, 30))
+goal_img = pygame.transform.scale(goal_img, (30, 30))
+entity_img = pygame.transform.scale(entity_img, (entity_size, entity_size))
+background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
+
+# Initialize the game window
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Maze Game")
+
+# Clock to control the frame rate
+clock = pygame.time.Clock()
+def draw_maze(level):
+    for i, row in enumerate(level):
+        for j, cell in enumerate(row):
+            x, y = j * 30, i * 30
+
+            if cell == "#":  # Wall
+                screen.blit(wall_img, (x, y))
+            elif cell == "S":  # Start
+                screen.blit(player_img, (x, y))
+            elif cell == "E":  # End
+                screen.blit(goal_img, (x, y))
+
+def draw_player():
+    screen.blit(player_img, (player_x, player_y))
+
+def draw_start_screen():
+    screen.blit(background_img, (0, 0))
+    font = pygame.font.Font(None, 36)
+    text = font.render("Press S to Start", True, WHITE)
+    screen.blit(text, (WIDTH // 4, HEIGHT // 2))
+
+def draw_end_screen():
+    screen.blit(background_img, (0, 0))
+    font = pygame.font.Font(None, 36)
+    text = font.render("You Win! Press S to Play Next Level", True, WHITE)
+    screen.blit(text, (WIDTH // 4, HEIGHT // 2))
+    
+class Entity:
+    def __init__(self, x, y, speed):
+        self.x = x
+        self.y = y
+        self.speed = speed
+        self.direction = 1  # 1 for right, -1 for left
+
+    def update(self):
+        # Move the entity back and forth
+        self.x += self.speed * self.direction
+
+        # Change direction if the entity reaches the screen boundaries
+        if self.x <= 0 or self.x >= WIDTH - entity_size:
+            self.direction *= -1
+
+    def draw(self):
+        screen.blit(entity_img, (self.x, self.y))
+
+# Create a moving entity
+enemy = Entity(entity_x, entity_y, entity_speed)
+
+# Game loop
+running = True
+current_level = 0
+game_active = False
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_s:
+               # Start the game when the 'S' key is pressed
+               if not game_active:
+                   game_active = True
+                   player_x, player_y = 30, 30
+
+    if game_active:
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and levels[current_level][player_y // 30][(player_x - player_speed) // 30] != "#":
+            player_x -= player_speed
+        if keys[pygame.K_RIGHT] and levels[current_level][player_y // 30][(player_x + player_speed) // 30] != "#":
+            player_x += player_speed
+
+        # Apply gravity to the player
+        if not on_ground:
+            player_y += gravity
+
+        # Check for collisions with the ground
+        if player_y >= HEIGHT - player_size:
+            player_y = HEIGHT - player_size
+            on_ground = True
+        elif levels[current_level][(player_y + player_size) // 30][player_x // 30] == "#":
+            # If there's a wall below the player, move the player above the wall
+            player_y = ((player_y + player_size) // 30) * 30 - player_size
+            on_ground = True
+            
+            # Jumping
+        if on_ground:
+            if keys[pygame.K_SPACE]:
+                # Jump when the spacebar is pressed and the player is on the ground
+                player_y += jump_height
+                on_ground = False
+
+        # Check if the player reached the end
+        if levels[current_level][player_y // 30][player_x // 30] == "E":
+            game_active = False
+
+        # Update the moving entity
+        enemy.update()
+
+        # Clear the screen
+        screen.blit(background_img, (0, 0))
+
+        # Draw maze and entities for the current level
+        draw_maze(levels[current_level])
+        draw_player()
+        enemy.draw()
+
+    else:
+        # Draw the start or end screen
+        if current_level == len(levels) - 1 and levels[current_level][player_y // 30][player_x // 30] == "E":
+            draw_end_screen()
+        else:
+            draw_start_screen()
+
+    # Update the display
+    pygame.display.flip()
+
+    # Cap the frame rate
+    clock.tick(FPS)
+
+pygame.quit()
+sys.exit()
